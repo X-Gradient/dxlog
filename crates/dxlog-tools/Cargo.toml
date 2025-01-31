@@ -1,0 +1,10 @@
+[package]
+name = "dxlog-tools"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+reqwest = { version = "0.12.12", features = ["blocking", "json"] }
+scraper = "0.22.0"
+serde.workspace = true

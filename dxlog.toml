@@ -1,0 +1,23 @@
+# Default configuration for dxlog
+date-format = "%Y-%m-%d"
+stale-days = 14  # Number of days before a research log is considered stale
+
+[storage]
+active-dir = "research-logs"
+archive-dir = "archived"
+knowledge-base-dir = "knowledge-base"
+
+[templates]
+hypothesis = "templates/hypothesis.jinja"
+literature = "templates/literature.jinja"
+
+[git]
+# When git is enabled
+# author and email will be set using
+# git user data
+enabled = true  # Enable Git integration
+auto-commit = false  # Automatically commit changes
+
+# [author]
+# name = ""  # Will try to get from git config if empty
+# email = ""  # Will try to get from git config if empty

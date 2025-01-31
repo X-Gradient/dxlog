@@ -1,0 +1,15 @@
+[package]
+name = "dxlog-cli"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "dxlog"
+path = "src/main.rs"
+
+[dependencies]
+dxlog = { path = "../dxlog" }
+anyhow.workspace = true
+clap.workspace = true
+minijinja.workspace = true
+serde_yaml.workspace = true

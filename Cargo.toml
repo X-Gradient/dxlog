@@ -1,0 +1,23 @@
+[workspace]
+members = [
+    "crates/dxlog",
+    "crates/dxlog-cli",
+    "crates/dxlog-tools"
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+
+[workspace.dependencies]
+anyhow = "1.0.95"
+chrono = "0.4.39"
+clap = { version = "4.5.26", features = ["derive"] }
+git2 = "0.20.0"
+minijinja = "2.6.0"
+serde = { version = "1.0.217", features = ["derive"] }
+serde_yaml = "0.9.34"
+thiserror = "2.0.11"
+toml = "0.8.19"
+uuid = { version = "1.12.0", features = ["v4", "serde"] }
