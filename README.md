@@ -7,7 +7,7 @@ A command-line tool for managing research hypotheses, literature reviews, and kn
 
 ## Quick Start
 
-Start by installing the CLI `cargo install --git https://github.com/exploding-gradient/dxlog dxlog-cli`
+Start by installing the CLI `cargo install --git https://github.com/x-gradient/dxlog dxlog-cli`
 
 
 1. Initialize a new research repository:
