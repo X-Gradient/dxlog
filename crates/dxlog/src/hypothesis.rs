@@ -96,6 +96,7 @@ impl ResearchLog for HypothesisLog {
             _ => Ok(config.storage.active_dir.join(filename)),
         }
     }
+
 }
 
 pub struct HypothesisManager {

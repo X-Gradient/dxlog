@@ -84,6 +84,7 @@ impl ResearchLog for KnowledgeLog {
             _ => Ok(config.storage.active_dir.join(filename)),
         }
     }
+
 }
 
 pub struct KnowledgeManager {

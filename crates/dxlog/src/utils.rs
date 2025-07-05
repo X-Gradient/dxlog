@@ -128,7 +128,7 @@ pub fn commit_changes(paths: &[PathBuf], message: &str) -> Result<()> {
     Ok(())
 }
 
-pub fn detect_cycles(references: &HashSet<Uuid>, new_ref: Uuid, logs: &[BaseLog]) -> bool {
+pub fn detect_cycles(_references: &HashSet<Uuid>, new_ref: Uuid, logs: &[BaseLog]) -> bool {
     let mut visited = HashSet::new();
     let mut stack = vec![new_ref];
 

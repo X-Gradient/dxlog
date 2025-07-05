@@ -102,6 +102,7 @@ impl ResearchLog for LiteratureLog {
             _ => Ok(lit_path(config.storage.active_dir.clone())),
         }
     }
+
 }
 
 pub struct LiteratureManager {

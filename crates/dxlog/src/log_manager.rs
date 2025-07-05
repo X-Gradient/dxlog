@@ -33,6 +33,8 @@ impl<T: ResearchLog> LogManager<T> {
             for file_path in files {
                 let content = load_entry_content(&file_path)?;
                 let (log, _) = extract_frontmatter::<T>(&content)?;
+                
+                
                 if log.base().id.to_string().starts_with(partial_id) {
                     matches.push((log, file_path.clone()));
                 }
@@ -66,6 +68,7 @@ impl<T: ResearchLog> LogManager<T> {
                 let content = load_entry_content(&file_path)?;
                 let (log, _) = extract_frontmatter::<T>(&content)?;
 
+
                 if let Some(target_status) = &status {
                     if log.status().to_string() != target_status.to_string() {
                         continue;
@@ -89,6 +92,8 @@ impl<T: ResearchLog> LogManager<T> {
             for file_path in files {
                 let content = load_entry_content(&file_path)?;
                 let (log, _) = extract_frontmatter::<T>(&content)?;
+                
+                
                 if log.base().title.to_lowercase() == title.to_lowercase() {
                     return Ok(Some((log.base().title.clone(), file_path)));
                 }

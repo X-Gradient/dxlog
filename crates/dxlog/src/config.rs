@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "kebab-case")]
 pub struct Config {
     pub date_format: String,
     pub templates: TemplateConfig,
@@ -11,6 +12,7 @@ pub struct Config {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "kebab-case")]
 pub struct StorageConfig {
     pub active_dir: PathBuf,
     pub archive_dir: PathBuf,
