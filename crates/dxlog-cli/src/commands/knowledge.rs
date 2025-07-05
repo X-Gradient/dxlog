@@ -1,6 +1,6 @@
 // crates/dxlog-cli/src/commands/knowledge.rs
 use anyhow::Result;
-use dxlog::{create_knowledge, list_knowledge, update_knowledge_status, KnowledgeStatus};
+use dxlog::{create_knowledge, edit_knowledge, list_knowledge, update_knowledge_status, KnowledgeStatus};
 
 #[derive(clap::Subcommand, Clone)]
 pub enum KnowledgeCommands {
@@ -48,6 +48,19 @@ pub enum KnowledgeCommands {
     /// Example:
     ///   dxlog knowledge archive 9k4l6mno
     Archive {
+        /// ID of the knowledge entry (can be partial)
+        #[arg(help = "Unique identifier or first few characters of the entry ID")]
+        id: String,
+    },
+
+    /// Edit a knowledge entry in your default editor
+    ///
+    /// Opens the knowledge entry file in your preferred text editor for modification.
+    /// Editor priority: DXLOG_EDITOR env var → config file → EDITOR env var → nano
+    ///
+    /// Example:
+    ///   dxlog knowledge edit 9k4l6mno
+    Edit {
         /// ID of the knowledge entry (can be partial)
         #[arg(help = "Unique identifier or first few characters of the entry ID")]
         id: String,
@@ -103,6 +116,11 @@ impl KnowledgeCommands {
             Self::Archive { id } => {
                 update_knowledge_status(id, KnowledgeStatus::Archived)?;
                 println!("Update Knowledge {}; Status => Archived", id);
+                Ok(())
+            }
+            Self::Edit { id } => {
+                edit_knowledge(id)?;
+                println!("Knowledge {} edited successfully", id);
                 Ok(())
             }
             Self::List { status, tags } => {

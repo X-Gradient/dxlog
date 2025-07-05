@@ -1,0 +1,10 @@
+include README.md
+include LICENSE
+include pyproject.toml
+recursive-include mkdocs_dxlog_plugin *.py
+recursive-include example *
+prune __pycache__
+prune *.pyc
+prune .pytest_cache
+prune .mypy_cache
+prune .ruff_cache

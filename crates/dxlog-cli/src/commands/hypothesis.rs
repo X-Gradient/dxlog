@@ -1,5 +1,5 @@
 use anyhow::Result;
-use dxlog::{create_hypothesis, list_hypotheses, update_hypothesis_status, HypothesisStatus};
+use dxlog::{create_hypothesis, edit_hypothesis, list_hypotheses, update_hypothesis_status, HypothesisStatus};
 
 // crates/dxlog-cli/src/commands/hypothesis.rs
 #[derive(clap::Subcommand, Clone)]
@@ -80,6 +80,19 @@ pub enum HypothesisCommands {
         id: String,
     },
 
+    /// Edit a hypothesis in your default editor
+    ///
+    /// Opens the hypothesis file in your preferred text editor for modification.
+    /// Editor priority: DXLOG_EDITOR env var → config file → EDITOR env var → nano
+    ///
+    /// Example:
+    ///   dxlog hypothesis edit 4d9e1ghi
+    Edit {
+        /// ID of the hypothesis (can be partial)
+        #[arg(help = "Unique identifier or first few characters of the hypothesis ID")]
+        id: String,
+    },
+
     /// List hypotheses with optional filters
     ///
     /// Display all hypotheses, optionally filtered by status and/or tags.
@@ -140,6 +153,11 @@ impl HypothesisCommands {
             Self::Suspend { id } => {
                 update_hypothesis_status(id, HypothesisStatus::Suspended)?;
                 println!("Update Hypothesis {}; Status => Suspended", id);
+                Ok(())
+            }
+            Self::Edit { id } => {
+                edit_hypothesis(id)?;
+                println!("Hypothesis {} edited successfully", id);
                 Ok(())
             }
             Self::List { status, tags } => {

@@ -1,6 +1,6 @@
 use anyhow::Result;
 use dxlog::{
-    create_literature, delete_literature, list_literature, update_literature_status,
+    create_literature, delete_literature, edit_literature, list_literature, update_literature_status,
     LiteratureStatus,
 };
 
@@ -68,6 +68,19 @@ pub enum LiteratureCommands {
         id: String,
     },
 
+    /// Edit a literature review in your default editor
+    ///
+    /// Opens the literature review file in your preferred text editor for modification.
+    /// Editor priority: DXLOG_EDITOR env var → config file → EDITOR env var → nano
+    ///
+    /// Example:
+    ///   dxlog literature edit 7h2i4ghi
+    Edit {
+        /// ID of the literature entry (can be partial)
+        #[arg(help = "Unique identifier or first few characters of the entry ID")]
+        id: String,
+    },
+
     /// List literature reviews with optional filters
     ///
     /// Display all literature reviews, optionally filtered by status and/or tags.
@@ -114,6 +127,11 @@ impl LiteratureCommands {
             Self::Delete { id } => delete_literature(id),
             Self::Complete { id } => update_literature_status(id, LiteratureStatus::Completed),
             Self::Archive { id } => update_literature_status(id, LiteratureStatus::Archived),
+            Self::Edit { id } => {
+                edit_literature(id)?;
+                println!("Literature {} edited successfully", id);
+                Ok(())
+            }
             Self::List { status, tags } => {
                 println!(
                     "{:<18} {:<20} {:<12} {:<18} {:<18} TAGS",

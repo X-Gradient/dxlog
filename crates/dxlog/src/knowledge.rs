@@ -8,7 +8,7 @@ use crate::{
     config::Config,
     load_config,
     log_manager::LogManager,
-    md_frontmatter::serialize_yaml_frontmatter,
+    md_frontmatter::{extract_frontmatter, serialize_yaml_frontmatter},
     research_log::ResearchLog,
     utils::{self, Author, BaseLog},
 };
@@ -79,10 +79,14 @@ impl ResearchLog for KnowledgeLog {
     fn get_target_path(&self, config: &Config, current_path: &PathBuf) -> Result<PathBuf> {
         let filename = current_path.file_name().unwrap();
         match self.status {
-            KnowledgeStatus::Archived => Ok(config.storage.archive_dir.join(filename)),
-            KnowledgeStatus::Published => Ok(config.storage.knowledge_base_dir.join(filename)),
-            _ => Ok(config.storage.active_dir.join(filename)),
+            KnowledgeStatus::Archived => Ok(config.storage.archive_dir.join("knowledge").join(filename)),
+            KnowledgeStatus::Published => Ok(config.storage.knowledge_base_dir.join("knowledge").join(filename)),
+            _ => Ok(config.storage.active_dir.join("knowledge").join(filename)),
         }
+    }
+
+    fn subdirectory_name() -> &'static str {
+        "knowledge"
     }
 
 }
@@ -94,8 +98,8 @@ pub struct KnowledgeManager {
 impl KnowledgeManager {
     pub fn new(config: Config) -> Self {
         let search_dirs = vec![
-            config.storage.active_dir.clone(),
-            config.storage.knowledge_base_dir.clone(),
+            config.storage.active_dir.join("knowledge"),
+            config.storage.knowledge_base_dir.join("knowledge"),
         ];
 
         Self {
@@ -159,4 +163,55 @@ pub fn list_knowledge(
     let config = load_config()?;
     let manager = KnowledgeManager::new(config);
     manager.list(status, tags)
+}
+
+pub fn edit_knowledge(partial_id: &str) -> Result<()> {
+    let config = load_config()?;
+    let manager = KnowledgeManager::new(config.clone());
+    
+    // Find the knowledge by partial ID
+    let (mut knowledge, file_path) = manager.manager.find_log(partial_id)?;
+    
+    // Read the current file content
+    let current_content = utils::load_entry_content(&file_path)?;
+    
+    // Create temporary file with current content
+    let filename = format!("{}.md", knowledge.base.id);
+    let temp_file = utils::create_temp_file_with_content(&current_content, &filename)?;
+    
+    // Get editor command and launch it
+    let editor_command = utils::get_editor_command(&config)?;
+    
+    // Launch editor
+    utils::launch_editor(&editor_command, &temp_file)?;
+    
+    // Read back the modified content
+    let modified_content = utils::read_temp_file(&temp_file)?;
+    
+    // Parse the modified frontmatter to validate structure
+    let (updated_knowledge, _): (KnowledgeLog, String) = 
+        extract_frontmatter(&modified_content)?;
+    
+    // Validate that critical fields haven't been corrupted
+    if updated_knowledge.base.id != knowledge.base.id {
+        return Err(anyhow::anyhow!("ID cannot be modified"));
+    }
+    if updated_knowledge.base.date != knowledge.base.date {
+        return Err(anyhow::anyhow!("Date cannot be modified"));
+    }
+    if updated_knowledge.base.created_by.name != knowledge.base.created_by.name 
+        || updated_knowledge.base.created_by.email != knowledge.base.created_by.email {
+        return Err(anyhow::anyhow!("Author cannot be modified"));
+    }
+    
+    // Update the knowledge with the new data
+    knowledge = updated_knowledge;
+    
+    // Use LogManager to update the log (handles file moves if status changed)
+    manager.manager.update_log(&mut knowledge, &file_path)?;
+    
+    // Cleanup temp file
+    utils::cleanup_temp_file(&temp_file)?;
+    
+    Ok(())
 }

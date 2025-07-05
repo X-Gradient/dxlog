@@ -111,7 +111,8 @@ impl<T: ResearchLog> LogManager<T> {
             ));
         }
         let file_name = utils::generate_filename(&log.base().title, &log.base().date);
-        let file_path = self.config.storage.active_dir.join(&file_name);
+        let subdirectory = T::subdirectory_name();
+        let file_path = self.config.storage.active_dir.join(subdirectory).join(&file_name);
         save_entry_content(&file_path, content)?;
         Ok(file_path)
     }

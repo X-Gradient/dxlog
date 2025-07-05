@@ -16,4 +16,5 @@ pub trait ResearchLog: Serialize + for<'de> Deserialize<'de> {
     fn new(title: String, tags: HashSet<String>, author: Author) -> Self;
     fn update_status(&mut self, new_status: Self::Status);
     fn get_target_path(&self, config: &Config, current_path: &PathBuf) -> Result<PathBuf>;
+    fn subdirectory_name() -> &'static str;
 }

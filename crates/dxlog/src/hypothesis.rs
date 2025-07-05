@@ -85,7 +85,7 @@ impl ResearchLog for HypothesisLog {
     fn get_target_path(&self, config: &Config, current_path: &PathBuf) -> Result<PathBuf> {
         let filename = current_path.file_name().unwrap();
         match self.status {
-            HypothesisStatus::Abandoned => Ok(config.storage.archive_dir.join(filename)),
+            HypothesisStatus::Abandoned => Ok(config.storage.archive_dir.join("hypotheses").join(filename)),
             HypothesisStatus::Proven
             | HypothesisStatus::Disproven
             | HypothesisStatus::Inconclusive => Ok(config
@@ -93,8 +93,12 @@ impl ResearchLog for HypothesisLog {
                 .knowledge_base_dir
                 .join("hypotheses")
                 .join(filename)),
-            _ => Ok(config.storage.active_dir.join(filename)),
+            _ => Ok(config.storage.active_dir.join("hypotheses").join(filename)),
         }
+    }
+
+    fn subdirectory_name() -> &'static str {
+        "hypotheses"
     }
 
 }
@@ -106,7 +110,7 @@ pub struct HypothesisManager {
 impl HypothesisManager {
     pub fn new(config: Config) -> Self {
         let search_dirs = vec![
-            config.storage.active_dir.clone(),
+            config.storage.active_dir.join("hypotheses"),
             config.storage.knowledge_base_dir.join("hypotheses"),
         ];
         Self {
@@ -172,6 +176,57 @@ pub fn list_hypotheses(
     let config = load_config()?;
     let manager = HypothesisManager::new(config);
     manager.list(status, tags)
+}
+
+pub fn edit_hypothesis(partial_id: &str) -> Result<()> {
+    let config = load_config()?;
+    let manager = HypothesisManager::new(config.clone());
+    
+    // Find the hypothesis by partial ID
+    let (mut hypothesis, file_path) = manager.manager.find_log(partial_id)?;
+    
+    // Read the current file content
+    let current_content = utils::load_entry_content(&file_path)?;
+    
+    // Create temporary file with current content
+    let filename = format!("{}.md", hypothesis.base.id);
+    let temp_file = utils::create_temp_file_with_content(&current_content, &filename)?;
+    
+    // Get editor command and launch it
+    let editor_command = utils::get_editor_command(&config)?;
+    
+    // Launch editor
+    utils::launch_editor(&editor_command, &temp_file)?;
+    
+    // Read back the modified content
+    let modified_content = utils::read_temp_file(&temp_file)?;
+    
+    // Parse the modified frontmatter to validate structure
+    let (updated_hypothesis, _): (HypothesisLog, String) = 
+        extract_frontmatter(&modified_content)?;
+    
+    // Validate that critical fields haven't been corrupted
+    if updated_hypothesis.base.id != hypothesis.base.id {
+        return Err(anyhow::anyhow!("ID cannot be modified"));
+    }
+    if updated_hypothesis.base.date != hypothesis.base.date {
+        return Err(anyhow::anyhow!("Date cannot be modified"));
+    }
+    if updated_hypothesis.base.created_by.name != hypothesis.base.created_by.name 
+        || updated_hypothesis.base.created_by.email != hypothesis.base.created_by.email {
+        return Err(anyhow::anyhow!("Author cannot be modified"));
+    }
+    
+    // Update the hypothesis with the new data
+    hypothesis = updated_hypothesis;
+    
+    // Use LogManager to update the log (handles file moves if status changed)
+    manager.manager.update_log(&mut hypothesis, &file_path)?;
+    
+    // Cleanup temp file
+    utils::cleanup_temp_file(&temp_file)?;
+    
+    Ok(())
 }
 
 pub fn _create_hypothesis(title: &str, tags: Option<Vec<String>>) -> Result<HypothesisLog> {

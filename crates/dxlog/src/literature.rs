@@ -103,6 +103,10 @@ impl ResearchLog for LiteratureLog {
         }
     }
 
+    fn subdirectory_name() -> &'static str {
+        "literature"
+    }
+
 }
 
 pub struct LiteratureManager {
@@ -214,6 +218,57 @@ pub fn list_literature(
     let config = load_config()?;
     let manager = LiteratureManager::new(config);
     manager.list(status, tags)
+}
+
+pub fn edit_literature(partial_id: &str) -> Result<()> {
+    let config = load_config()?;
+    let manager = LiteratureManager::new(config.clone());
+    
+    // Find the literature by partial ID
+    let (mut literature, file_path) = manager.manager.find_log(partial_id)?;
+    
+    // Read the current file content
+    let current_content = utils::load_entry_content(&file_path)?;
+    
+    // Create temporary file with current content
+    let filename = format!("{}.md", literature.base.id);
+    let temp_file = utils::create_temp_file_with_content(&current_content, &filename)?;
+    
+    // Get editor command and launch it
+    let editor_command = utils::get_editor_command(&config)?;
+    
+    // Launch editor
+    utils::launch_editor(&editor_command, &temp_file)?;
+    
+    // Read back the modified content
+    let modified_content = utils::read_temp_file(&temp_file)?;
+    
+    // Parse the modified frontmatter to validate structure
+    let (updated_literature, _): (LiteratureLog, String) = 
+        extract_frontmatter(&modified_content)?;
+    
+    // Validate that critical fields haven't been corrupted
+    if updated_literature.base.id != literature.base.id {
+        return Err(anyhow::anyhow!("ID cannot be modified"));
+    }
+    if updated_literature.base.date != literature.base.date {
+        return Err(anyhow::anyhow!("Date cannot be modified"));
+    }
+    if updated_literature.base.created_by.name != literature.base.created_by.name 
+        || updated_literature.base.created_by.email != literature.base.created_by.email {
+        return Err(anyhow::anyhow!("Author cannot be modified"));
+    }
+    
+    // Update the literature with the new data
+    literature = updated_literature;
+    
+    // Use LogManager to update the log (handles file moves if status changed)
+    manager.manager.update_log(&mut literature, &file_path)?;
+    
+    // Cleanup temp file
+    utils::cleanup_temp_file(&temp_file)?;
+    
+    Ok(())
 }
 
 pub fn _find_literature_file(config: &Config, partial_id: &str) -> Result<PathBuf> {

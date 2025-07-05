@@ -9,6 +9,7 @@ pub struct Config {
     pub templates: TemplateConfig,
     pub storage: StorageConfig,
     pub stale_days: u64,
+    pub editor: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -41,6 +42,7 @@ impl Default for Config {
                 knowledge_base_dir: "knowledge-base".into(),
             },
             stale_days: 14,
+            editor: None,
         }
     }
 }

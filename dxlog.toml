@@ -10,6 +10,7 @@ knowledge-base-dir = "knowledge-base"
 [templates]
 hypothesis = "templates/hypothesis.jinja"
 literature = "templates/literature.jinja"
+knowledge = "templates/knowledge.jinja"
 
 [git]
 # When git is enabled
