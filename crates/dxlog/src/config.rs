@@ -48,7 +48,7 @@ impl Default for Config {
 }
 
 pub fn load_config() -> Result<Config> {
-    let config_path = std::path::Path::new(".rlog.toml");
+    let config_path = std::path::Path::new("dxlog.toml");
     if !config_path.exists() {
         return Ok(Config::default());
     }

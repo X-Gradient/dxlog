@@ -14,7 +14,7 @@ pub struct Author {
     pub email: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BaseLog {
     pub id: Uuid,
     pub date: String,

@@ -1,9 +1,9 @@
 use std::path::PathBuf;
 
-use dxlog::init_repository;
+use dxlog::{init_repository, list_latest_active_logs};
 
 use crate::commands::{
-    HypothesisCommands, KnowledgeCommands, LiteratureCommands, ReferenceCommands,
+    GraphCommands, HypothesisCommands, KnowledgeCommands, LiteratureCommands, ReferenceCommands,
 };
 
 #[derive(clap::Parser)]
@@ -52,6 +52,32 @@ pub enum Commands {
         #[command(subcommand)]
         command: ReferenceCommands,
     },
+
+    /// Visualize and analyze the research graph
+    Graph {
+        #[command(subcommand)]
+        command: GraphCommands,
+    },
+
+    /// Show all latest active logs
+    ///
+    /// Display a summary of all active research logs from the research-logs directory.
+    /// This includes hypotheses, literature reviews, and knowledge entries with
+    /// status 'active' or 'suspended'.
+    ///
+    /// Examples:
+    ///   dxlog latest
+    ///   dxlog latest --limit 10
+    Latest {
+        /// Limit the number of entries shown
+        #[arg(
+            short,
+            long,
+            default_value = "20",
+            help = "Maximum number of entries to display"
+        )]
+        limit: usize,
+    },
 }
 
 impl Cli {
@@ -62,6 +88,8 @@ impl Cli {
             Commands::Literature { command } => command.execute(),
             Commands::Knowledge { command } => command.execute(),
             Commands::Reference { command } => command.execute(),
+            Commands::Graph { command } => command.execute(),
+            Commands::Latest { limit } => list_latest_active_logs(*limit),
         }
     }
 }

@@ -1,6 +1,6 @@
 // crates/dxlog/src/reference.rs
 use crate::{
-    load_config, research_log::ResearchLog, HypothesisManager, HypothesisStatus, KnowledgeManager,
+    load_config, research_log::ResearchLog, utils::{self, BaseLog}, HypothesisManager, HypothesisStatus, KnowledgeManager,
     KnowledgeStatus, LiteratureManager, LiteratureStatus,
 };
 use anyhow::Result;
@@ -14,6 +14,51 @@ pub struct ReferenceInfo {
     pub tags: HashSet<String>,
 }
 
+fn collect_all_logs() -> Result<Vec<BaseLog>> {
+    let config = load_config()?;
+    let h_manager = HypothesisManager::new(config.clone());
+    let l_manager = LiteratureManager::new(config.clone());
+    let k_manager = KnowledgeManager::new(config.clone());
+    
+    let mut all_logs = Vec::new();
+    
+    // Collect hypothesis logs
+    let hypotheses = h_manager.manager.list_logs(None, None)?;
+    for hypothesis in hypotheses {
+        all_logs.push(hypothesis.base().clone());
+    }
+    
+    // Collect literature logs
+    let literature_items = l_manager.manager.list_logs(None, None)?;
+    for literature in literature_items {
+        all_logs.push(literature.base().clone());
+    }
+    
+    // Collect knowledge logs
+    let knowledge_items = k_manager.manager.list_logs(None, None)?;
+    for knowledge in knowledge_items {
+        all_logs.push(knowledge.base().clone());
+    }
+    
+    Ok(all_logs)
+}
+
+fn validate_target_exists(target_id: &str) -> Result<()> {
+    let config = load_config()?;
+    let h_manager = HypothesisManager::new(config.clone());
+    let l_manager = LiteratureManager::new(config.clone());
+    let k_manager = KnowledgeManager::new(config.clone());
+    
+    // Try to find the target in any of the managers
+    if h_manager.find(target_id).is_ok() 
+        || l_manager.find(target_id).is_ok() 
+        || k_manager.find(target_id).is_ok() {
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!("Target reference '{}' not found", target_id))
+    }
+}
+
 pub fn add_reference(source_id: &str, target_id: &str) -> Result<()> {
     let config = load_config()?;
     let h_manager = HypothesisManager::new(config.clone());
@@ -21,14 +66,39 @@ pub fn add_reference(source_id: &str, target_id: &str) -> Result<()> {
     let k_manager = KnowledgeManager::new(config.clone());
 
     let target_uuid = Uuid::parse_str(target_id)?;
+    
+    // Validate target exists
+    validate_target_exists(target_id)?;
+    
+    // Check if target is in complete state (warn but don't fail)
+    if !is_reference_complete(target_id)? {
+        return Err(anyhow::anyhow!(
+            "Warning: Referenced research log is not in a complete state (proven, completed, or published). References should ideally point to completed research."
+        ));
+    }
+
+    // Collect all logs for cycle detection
+    let all_logs = collect_all_logs()?;
 
     if let Ok((mut log, path)) = h_manager.find(source_id) {
+        // Check for cycles before adding
+        if utils::detect_cycles(&log.base().references, target_uuid, &all_logs) {
+            return Err(anyhow::anyhow!("Adding this reference would create a cycle"));
+        }
         log.base_mut().references.insert(target_uuid);
         h_manager.manager.update_log(&mut log, &path)
     } else if let Ok((mut log, path)) = l_manager.find(source_id) {
+        // Check for cycles before adding
+        if utils::detect_cycles(&log.base().references, target_uuid, &all_logs) {
+            return Err(anyhow::anyhow!("Adding this reference would create a cycle"));
+        }
         log.base_mut().references.insert(target_uuid);
         l_manager.manager.update_log(&mut log, &path)
     } else if let Ok((mut log, path)) = k_manager.find(source_id) {
+        // Check for cycles before adding
+        if utils::detect_cycles(&log.base().references, target_uuid, &all_logs) {
+            return Err(anyhow::anyhow!("Adding this reference would create a cycle"));
+        }
         log.base_mut().references.insert(target_uuid);
         k_manager.manager.update_log(&mut log, &path)
     } else {
@@ -63,20 +133,32 @@ pub fn force_add_reference(source_id: &str, target_id: &str) -> Result<()> {
     let k_manager = KnowledgeManager::new(config.clone());
 
     let target_uuid = Uuid::parse_str(target_id)?;
+    
+    // Validate target exists
+    validate_target_exists(target_id)?;
 
-    if !is_reference_complete(target_id)? {
-        return Err(anyhow::anyhow!(
-            "Warning: Referenced research log is not in a complete state (proven, completed, or published). References should ideally point to completed research."
-        ));
-    }
+    // Collect all logs for cycle detection (still enforce cycle prevention even in force mode)
+    let all_logs = collect_all_logs()?;
 
     if let Ok((mut log, path)) = h_manager.find(source_id) {
+        // Check for cycles before adding (even in force mode)
+        if utils::detect_cycles(&log.base().references, target_uuid, &all_logs) {
+            return Err(anyhow::anyhow!("Adding this reference would create a cycle"));
+        }
         log.base_mut().references.insert(target_uuid);
         h_manager.manager.update_log(&mut log, &path)
     } else if let Ok((mut log, path)) = l_manager.find(source_id) {
+        // Check for cycles before adding (even in force mode)
+        if utils::detect_cycles(&log.base().references, target_uuid, &all_logs) {
+            return Err(anyhow::anyhow!("Adding this reference would create a cycle"));
+        }
         log.base_mut().references.insert(target_uuid);
         l_manager.manager.update_log(&mut log, &path)
     } else if let Ok((mut log, path)) = k_manager.find(source_id) {
+        // Check for cycles before adding (even in force mode)
+        if utils::detect_cycles(&log.base().references, target_uuid, &all_logs) {
+            return Err(anyhow::anyhow!("Adding this reference would create a cycle"));
+        }
         log.base_mut().references.insert(target_uuid);
         k_manager.manager.update_log(&mut log, &path)
     } else {
@@ -150,4 +232,55 @@ pub fn list_references(id: &str) -> Result<Vec<ReferenceInfo>> {
     }
 
     Ok(references)
+}
+
+pub fn find_referencing_items(target_id: &str) -> Result<Vec<ReferenceInfo>> {
+    let target_uuid = Uuid::parse_str(target_id)?;
+    let config = load_config()?;
+    let h_manager = HypothesisManager::new(config.clone());
+    let l_manager = LiteratureManager::new(config.clone());
+    let k_manager = KnowledgeManager::new(config.clone());
+    
+    let mut referencing_items = Vec::new();
+    
+    // Check all hypotheses
+    let hypotheses = h_manager.manager.list_logs(None, None)?;
+    for hypothesis in hypotheses {
+        if hypothesis.base().references.contains(&target_uuid) {
+            referencing_items.push(ReferenceInfo {
+                id: hypothesis.base().id.to_string(),
+                type_: "hypothesis".to_string(),
+                title: hypothesis.base().title.clone(),
+                tags: hypothesis.base().tags.clone(),
+            });
+        }
+    }
+    
+    // Check all literature
+    let literature_items = l_manager.manager.list_logs(None, None)?;
+    for literature in literature_items {
+        if literature.base().references.contains(&target_uuid) {
+            referencing_items.push(ReferenceInfo {
+                id: literature.base().id.to_string(),
+                type_: "literature".to_string(),
+                title: literature.base().title.clone(),
+                tags: literature.base().tags.clone(),
+            });
+        }
+    }
+    
+    // Check all knowledge
+    let knowledge_items = k_manager.manager.list_logs(None, None)?;
+    for knowledge in knowledge_items {
+        if knowledge.base().references.contains(&target_uuid) {
+            referencing_items.push(ReferenceInfo {
+                id: knowledge.base().id.to_string(),
+                type_: "knowledge".to_string(),
+                title: knowledge.base().title.clone(),
+                tags: knowledge.base().tags.clone(),
+            });
+        }
+    }
+    
+    Ok(referencing_items)
 }

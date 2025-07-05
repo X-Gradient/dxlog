@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use anyhow::Result;
-use dxlog::{add_reference, force_add_reference, list_references, remove_reference};
+use dxlog::{add_reference, force_add_reference, list_references, remove_reference, find_referencing_items};
 
 #[derive(clap::Subcommand, Clone)]
 pub enum ReferenceCommands {
@@ -47,6 +47,18 @@ pub enum ReferenceCommands {
     List {
         /// ID of the entry (can be partial)
         #[arg(help = "Show references for this entry ID")]
+        id: String,
+    },
+
+    /// Show what entries reference this entry
+    ///
+    /// Shows all entries that reference the specified entry (backward references).
+    ///
+    /// Example:
+    ///   dxlog reference backrefs 1a2b3c4d
+    Backrefs {
+        /// ID of the entry (can be partial)
+        #[arg(help = "Show entries that reference this ID")]
         id: String,
     },
 }
@@ -98,6 +110,30 @@ impl ReferenceCommands {
                         "{:<12} {:<12} {:<20} {:<30}",
                         short_id, reference.type_, reference.title, tags_str
                     );
+                }
+                Ok(())
+            }
+            Self::Backrefs { id } => {
+                println!("{:<12} {:<12} {:<20} {:<30}", "ID", "TYPE", "TITLE", "TAGS");
+                println!("Items that reference {}:", id);
+                let referencing_items = find_referencing_items(id)?;
+                if referencing_items.is_empty() {
+                    println!("No items reference this entry.");
+                } else {
+                    for item in referencing_items {
+                        let short_id = &item.id[..8];
+                        let tags_str = item
+                            .tags
+                            .iter()
+                            .cloned()
+                            .collect::<Vec<String>>()
+                            .join(", ");
+
+                        println!(
+                            "{:<12} {:<12} {:<20} {:<30}",
+                            short_id, item.type_, item.title, tags_str
+                        );
+                    }
                 }
                 Ok(())
             }
