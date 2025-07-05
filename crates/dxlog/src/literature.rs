@@ -7,8 +7,8 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 use uuid::Uuid;
 
-use crate::config::{load_config, Config};
-use crate::log_manager::LogManager;
+use crate::config::{load_config, Config, TemplateConfig};
+use crate::generic_manager::{GenericManager, TemplatePathProvider};
 use crate::md_frontmatter::{extract_frontmatter, serialize_yaml_frontmatter};
 use crate::research_log::ResearchLog;
 use crate::utils::{self, Author, BaseLog};
@@ -109,18 +109,20 @@ impl ResearchLog for LiteratureLog {
 
 }
 
+impl TemplatePathProvider for LiteratureLog {
+    fn template_path(config: &TemplateConfig) -> &PathBuf {
+        &config.literature
+    }
+}
+
 pub struct LiteratureManager {
-    pub manager: LogManager<LiteratureLog>,
+    pub manager: GenericManager<LiteratureLog>,
 }
 
 impl LiteratureManager {
     pub fn new(config: Config) -> Self {
-        let search_dirs = vec![
-            config.storage.active_dir.join("literature"),
-            config.storage.knowledge_base_dir.join("literature"),
-        ];
         Self {
-            manager: LogManager::new(config, search_dirs),
+            manager: GenericManager::new_with_template_provider(config),
         }
     }
 
@@ -164,18 +166,16 @@ impl LiteratureManager {
             abstract_text => abstract_text,
         })?;
 
-        self.manager.save_log(&literature, &rendered)?;
+        self.manager.log_manager.save_log(&literature, &rendered)?;
         Ok(literature)
     }
 
     pub fn update_status(&self, partial_id: &str, new_status: LiteratureStatus) -> Result<()> {
-        let (mut literature, file_path) = self.manager.find_log(partial_id)?;
-        literature.update_status(new_status);
-        self.manager.update_log(&mut literature, &file_path)
+        self.manager.update_status(partial_id, new_status)
     }
 
     pub fn delete(&self, partial_id: &str) -> Result<()> {
-        let (_, file_path) = self.manager.find_log(partial_id)?;
+        let (_, file_path) = self.manager.find(partial_id)?;
         std::fs::remove_file(file_path)?;
         Ok(())
     }
@@ -185,11 +185,15 @@ impl LiteratureManager {
         status: Option<LiteratureStatus>,
         tags: Option<Vec<String>>,
     ) -> Result<Vec<LiteratureLog>> {
-        self.manager.list_logs(status, tags)
+        self.manager.list(status, tags)
     }
 
     pub fn find(&self, partial_id: &str) -> Result<(LiteratureLog, PathBuf)> {
-        self.manager.find_log(partial_id)
+        self.manager.find(partial_id)
+    }
+
+    pub fn edit(&self, partial_id: &str) -> Result<()> {
+        self.manager.edit(partial_id)
     }
 }
 
@@ -222,53 +226,8 @@ pub fn list_literature(
 
 pub fn edit_literature(partial_id: &str) -> Result<()> {
     let config = load_config()?;
-    let manager = LiteratureManager::new(config.clone());
-    
-    // Find the literature by partial ID
-    let (mut literature, file_path) = manager.manager.find_log(partial_id)?;
-    
-    // Read the current file content
-    let current_content = utils::load_entry_content(&file_path)?;
-    
-    // Create temporary file with current content
-    let filename = format!("{}.md", literature.base.id);
-    let temp_file = utils::create_temp_file_with_content(&current_content, &filename)?;
-    
-    // Get editor command and launch it
-    let editor_command = utils::get_editor_command(&config)?;
-    
-    // Launch editor
-    utils::launch_editor(&editor_command, &temp_file)?;
-    
-    // Read back the modified content
-    let modified_content = utils::read_temp_file(&temp_file)?;
-    
-    // Parse the modified frontmatter to validate structure
-    let (updated_literature, _): (LiteratureLog, String) = 
-        extract_frontmatter(&modified_content)?;
-    
-    // Validate that critical fields haven't been corrupted
-    if updated_literature.base.id != literature.base.id {
-        return Err(anyhow::anyhow!("ID cannot be modified"));
-    }
-    if updated_literature.base.date != literature.base.date {
-        return Err(anyhow::anyhow!("Date cannot be modified"));
-    }
-    if updated_literature.base.created_by.name != literature.base.created_by.name 
-        || updated_literature.base.created_by.email != literature.base.created_by.email {
-        return Err(anyhow::anyhow!("Author cannot be modified"));
-    }
-    
-    // Update the literature with the new data
-    literature = updated_literature;
-    
-    // Use LogManager to update the log (handles file moves if status changed)
-    manager.manager.update_log(&mut literature, &file_path)?;
-    
-    // Cleanup temp file
-    utils::cleanup_temp_file(&temp_file)?;
-    
-    Ok(())
+    let manager = LiteratureManager::new(config);
+    manager.edit(partial_id)
 }
 
 pub fn _find_literature_file(config: &Config, partial_id: &str) -> Result<PathBuf> {

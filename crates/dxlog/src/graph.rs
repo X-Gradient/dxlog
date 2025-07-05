@@ -50,7 +50,7 @@ impl ReferenceGraph {
         let k_manager = KnowledgeManager::new(config.clone());
 
         // Add all nodes first
-        let hypotheses = h_manager.manager.list_logs(None, None)?;
+        let hypotheses = h_manager.manager.log_manager.list_logs(None, None)?;
         for hypothesis in hypotheses {
             let base = hypothesis.base();
             let node = GraphNode {
@@ -65,7 +65,7 @@ impl ReferenceGraph {
             graph.add_node(node);
         }
 
-        let literature_items = l_manager.manager.list_logs(None, None)?;
+        let literature_items = l_manager.manager.log_manager.list_logs(None, None)?;
         for literature in literature_items {
             let base = literature.base();
             let node = GraphNode {
@@ -80,7 +80,7 @@ impl ReferenceGraph {
             graph.add_node(node);
         }
 
-        let knowledge_items = k_manager.manager.list_logs(None, None)?;
+        let knowledge_items = k_manager.manager.log_manager.list_logs(None, None)?;
         for knowledge in knowledge_items {
             let base = knowledge.base();
             let node = GraphNode {
@@ -96,19 +96,19 @@ impl ReferenceGraph {
         }
 
         // Add all edges
-        let hypotheses = h_manager.manager.list_logs(None, None)?;
+        let hypotheses = h_manager.manager.log_manager.list_logs(None, None)?;
         for hypothesis in hypotheses {
             let base = hypothesis.base();
             graph.add_edges_for_log(base)?;
         }
 
-        let literature_items = l_manager.manager.list_logs(None, None)?;
+        let literature_items = l_manager.manager.log_manager.list_logs(None, None)?;
         for literature in literature_items {
             let base = literature.base();
             graph.add_edges_for_log(base)?;
         }
 
-        let knowledge_items = k_manager.manager.list_logs(None, None)?;
+        let knowledge_items = k_manager.manager.log_manager.list_logs(None, None)?;
         for knowledge in knowledge_items {
             let base = knowledge.base();
             graph.add_edges_for_log(base)?;

@@ -23,19 +23,19 @@ fn collect_all_logs() -> Result<Vec<BaseLog>> {
     let mut all_logs = Vec::new();
     
     // Collect hypothesis logs
-    let hypotheses = h_manager.manager.list_logs(None, None)?;
+    let hypotheses = h_manager.manager.log_manager.list_logs(None, None)?;
     for hypothesis in hypotheses {
         all_logs.push(hypothesis.base().clone());
     }
     
     // Collect literature logs
-    let literature_items = l_manager.manager.list_logs(None, None)?;
+    let literature_items = l_manager.manager.log_manager.list_logs(None, None)?;
     for literature in literature_items {
         all_logs.push(literature.base().clone());
     }
     
     // Collect knowledge logs
-    let knowledge_items = k_manager.manager.list_logs(None, None)?;
+    let knowledge_items = k_manager.manager.log_manager.list_logs(None, None)?;
     for knowledge in knowledge_items {
         all_logs.push(knowledge.base().clone());
     }
@@ -86,21 +86,21 @@ pub fn add_reference(source_id: &str, target_id: &str) -> Result<()> {
             return Err(anyhow::anyhow!("Adding this reference would create a cycle"));
         }
         log.base_mut().references.insert(target_uuid);
-        h_manager.manager.update_log(&mut log, &path)
+        h_manager.manager.log_manager.update_log(&mut log, &path)
     } else if let Ok((mut log, path)) = l_manager.find(source_id) {
         // Check for cycles before adding
         if utils::detect_cycles(&log.base().references, target_uuid, &all_logs) {
             return Err(anyhow::anyhow!("Adding this reference would create a cycle"));
         }
         log.base_mut().references.insert(target_uuid);
-        l_manager.manager.update_log(&mut log, &path)
+        l_manager.manager.log_manager.update_log(&mut log, &path)
     } else if let Ok((mut log, path)) = k_manager.find(source_id) {
         // Check for cycles before adding
         if utils::detect_cycles(&log.base().references, target_uuid, &all_logs) {
             return Err(anyhow::anyhow!("Adding this reference would create a cycle"));
         }
         log.base_mut().references.insert(target_uuid);
-        k_manager.manager.update_log(&mut log, &path)
+        k_manager.manager.log_manager.update_log(&mut log, &path)
     } else {
         Err(anyhow::anyhow!("Source log not found"))
     }
@@ -146,21 +146,21 @@ pub fn force_add_reference(source_id: &str, target_id: &str) -> Result<()> {
             return Err(anyhow::anyhow!("Adding this reference would create a cycle"));
         }
         log.base_mut().references.insert(target_uuid);
-        h_manager.manager.update_log(&mut log, &path)
+        h_manager.manager.log_manager.update_log(&mut log, &path)
     } else if let Ok((mut log, path)) = l_manager.find(source_id) {
         // Check for cycles before adding (even in force mode)
         if utils::detect_cycles(&log.base().references, target_uuid, &all_logs) {
             return Err(anyhow::anyhow!("Adding this reference would create a cycle"));
         }
         log.base_mut().references.insert(target_uuid);
-        l_manager.manager.update_log(&mut log, &path)
+        l_manager.manager.log_manager.update_log(&mut log, &path)
     } else if let Ok((mut log, path)) = k_manager.find(source_id) {
         // Check for cycles before adding (even in force mode)
         if utils::detect_cycles(&log.base().references, target_uuid, &all_logs) {
             return Err(anyhow::anyhow!("Adding this reference would create a cycle"));
         }
         log.base_mut().references.insert(target_uuid);
-        k_manager.manager.update_log(&mut log, &path)
+        k_manager.manager.log_manager.update_log(&mut log, &path)
     } else {
         Err(anyhow::anyhow!("Source log not found"))
     }
@@ -176,13 +176,13 @@ pub fn remove_reference(source_id: &str, target_id: &str) -> Result<()> {
 
     if let Ok((mut log, path)) = h_manager.find(source_id) {
         log.base_mut().references.remove(&target_uuid);
-        h_manager.manager.update_log(&mut log, &path)
+        h_manager.manager.log_manager.update_log(&mut log, &path)
     } else if let Ok((mut log, path)) = l_manager.find(source_id) {
         log.base_mut().references.remove(&target_uuid);
-        l_manager.manager.update_log(&mut log, &path)
+        l_manager.manager.log_manager.update_log(&mut log, &path)
     } else if let Ok((mut log, path)) = k_manager.find(source_id) {
         log.base_mut().references.remove(&target_uuid);
-        k_manager.manager.update_log(&mut log, &path)
+        k_manager.manager.log_manager.update_log(&mut log, &path)
     } else {
         Err(anyhow::anyhow!("Source log not found"))
     }
@@ -244,7 +244,7 @@ pub fn find_referencing_items(target_id: &str) -> Result<Vec<ReferenceInfo>> {
     let mut referencing_items = Vec::new();
     
     // Check all hypotheses
-    let hypotheses = h_manager.manager.list_logs(None, None)?;
+    let hypotheses = h_manager.manager.log_manager.list_logs(None, None)?;
     for hypothesis in hypotheses {
         if hypothesis.base().references.contains(&target_uuid) {
             referencing_items.push(ReferenceInfo {
@@ -257,7 +257,7 @@ pub fn find_referencing_items(target_id: &str) -> Result<Vec<ReferenceInfo>> {
     }
     
     // Check all literature
-    let literature_items = l_manager.manager.list_logs(None, None)?;
+    let literature_items = l_manager.manager.log_manager.list_logs(None, None)?;
     for literature in literature_items {
         if literature.base().references.contains(&target_uuid) {
             referencing_items.push(ReferenceInfo {
@@ -270,7 +270,7 @@ pub fn find_referencing_items(target_id: &str) -> Result<Vec<ReferenceInfo>> {
     }
     
     // Check all knowledge
-    let knowledge_items = k_manager.manager.list_logs(None, None)?;
+    let knowledge_items = k_manager.manager.log_manager.list_logs(None, None)?;
     for knowledge in knowledge_items {
         if knowledge.base().references.contains(&target_uuid) {
             referencing_items.push(ReferenceInfo {

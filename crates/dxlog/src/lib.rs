@@ -1,4 +1,5 @@
 mod config;
+mod generic_manager;
 mod graph;
 mod hypothesis;
 mod init;
@@ -12,6 +13,7 @@ mod research_log;
 pub mod utils;
 
 pub use config::*;
+pub use generic_manager::*;
 pub use graph::*;
 pub use hypothesis::*;
 pub use init::*;

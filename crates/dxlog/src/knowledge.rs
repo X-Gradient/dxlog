@@ -1,16 +1,14 @@
 use anyhow::Result;
-use minijinja::context;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, path::PathBuf};
 use uuid::Uuid;
 
 use crate::{
-    config::Config,
+    config::{Config, TemplateConfig},
+    generic_manager::{GenericManager, TemplatePathProvider},
     load_config,
-    log_manager::LogManager,
-    md_frontmatter::{extract_frontmatter, serialize_yaml_frontmatter},
     research_log::ResearchLog,
-    utils::{self, Author, BaseLog},
+    utils::{Author, BaseLog},
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, clap::ValueEnum)]
@@ -91,44 +89,29 @@ impl ResearchLog for KnowledgeLog {
 
 }
 
+impl TemplatePathProvider for KnowledgeLog {
+    fn template_path(config: &TemplateConfig) -> &PathBuf {
+        &config.knowledge
+    }
+}
+
 pub struct KnowledgeManager {
-    pub manager: LogManager<KnowledgeLog>,
+    pub manager: GenericManager<KnowledgeLog>,
 }
 
 impl KnowledgeManager {
     pub fn new(config: Config) -> Self {
-        let search_dirs = vec![
-            config.storage.active_dir.join("knowledge"),
-            config.storage.knowledge_base_dir.join("knowledge"),
-        ];
-
         Self {
-            manager: LogManager::<KnowledgeLog>::new(config, search_dirs),
+            manager: GenericManager::new_with_template_provider(config),
         }
     }
 
     pub fn create(&self, title: &str, tags: Option<Vec<String>>) -> Result<KnowledgeLog> {
-        let author = utils::get_git_author()?;
-        let knowledge = KnowledgeLog::new(title.to_string(), utils::normalize_tags(tags), author);
-
-        let yaml = serialize_yaml_frontmatter(&knowledge)?;
-        let template_content = utils::load_entry_content(&self.manager.config.templates.knowledge)?;
-
-        let env = minijinja::Environment::new();
-        let template = env.template_from_str(&template_content)?;
-        let rendered = template.render(context! {
-            research_log => yaml,
-            title => knowledge.base.title,
-        })?;
-
-        self.manager.save_log(&knowledge, &rendered)?;
-        Ok(knowledge)
+        self.manager.create(title, tags)
     }
 
     pub fn update_status(&self, partial_id: &str, new_status: KnowledgeStatus) -> Result<()> {
-        let (mut knowledge, file_path) = self.manager.find_log(partial_id)?;
-        knowledge.update_status(new_status);
-        self.manager.update_log(&mut knowledge, &file_path)
+        self.manager.update_status(partial_id, new_status)
     }
 
     pub fn list(
@@ -136,11 +119,15 @@ impl KnowledgeManager {
         status: Option<KnowledgeStatus>,
         tags: Option<Vec<String>>,
     ) -> Result<Vec<KnowledgeLog>> {
-        self.manager.list_logs(status, tags)
+        self.manager.list(status, tags)
     }
 
     pub fn find(&self, partial_id: &str) -> Result<(KnowledgeLog, PathBuf)> {
-        self.manager.find_log(partial_id)
+        self.manager.find(partial_id)
+    }
+
+    pub fn edit(&self, partial_id: &str) -> Result<()> {
+        self.manager.edit(partial_id)
     }
 }
 
@@ -167,51 +154,6 @@ pub fn list_knowledge(
 
 pub fn edit_knowledge(partial_id: &str) -> Result<()> {
     let config = load_config()?;
-    let manager = KnowledgeManager::new(config.clone());
-    
-    // Find the knowledge by partial ID
-    let (mut knowledge, file_path) = manager.manager.find_log(partial_id)?;
-    
-    // Read the current file content
-    let current_content = utils::load_entry_content(&file_path)?;
-    
-    // Create temporary file with current content
-    let filename = format!("{}.md", knowledge.base.id);
-    let temp_file = utils::create_temp_file_with_content(&current_content, &filename)?;
-    
-    // Get editor command and launch it
-    let editor_command = utils::get_editor_command(&config)?;
-    
-    // Launch editor
-    utils::launch_editor(&editor_command, &temp_file)?;
-    
-    // Read back the modified content
-    let modified_content = utils::read_temp_file(&temp_file)?;
-    
-    // Parse the modified frontmatter to validate structure
-    let (updated_knowledge, _): (KnowledgeLog, String) = 
-        extract_frontmatter(&modified_content)?;
-    
-    // Validate that critical fields haven't been corrupted
-    if updated_knowledge.base.id != knowledge.base.id {
-        return Err(anyhow::anyhow!("ID cannot be modified"));
-    }
-    if updated_knowledge.base.date != knowledge.base.date {
-        return Err(anyhow::anyhow!("Date cannot be modified"));
-    }
-    if updated_knowledge.base.created_by.name != knowledge.base.created_by.name 
-        || updated_knowledge.base.created_by.email != knowledge.base.created_by.email {
-        return Err(anyhow::anyhow!("Author cannot be modified"));
-    }
-    
-    // Update the knowledge with the new data
-    knowledge = updated_knowledge;
-    
-    // Use LogManager to update the log (handles file moves if status changed)
-    manager.manager.update_log(&mut knowledge, &file_path)?;
-    
-    // Cleanup temp file
-    utils::cleanup_temp_file(&temp_file)?;
-    
-    Ok(())
+    let manager = KnowledgeManager::new(config);
+    manager.edit(partial_id)
 }

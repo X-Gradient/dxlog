@@ -10,6 +10,8 @@ pub struct Config {
     pub storage: StorageConfig,
     pub stale_days: u64,
     pub editor: Option<String>,
+    #[serde(default)]
+    pub git: GitConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -25,6 +27,22 @@ pub struct TemplateConfig {
     pub hypothesis: PathBuf,
     pub literature: PathBuf,
     pub knowledge: PathBuf,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub struct GitConfig {
+    pub enabled: bool,
+    pub auto_commit: bool,
+}
+
+impl Default for GitConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            auto_commit: false,
+        }
+    }
 }
 
 impl Default for Config {
@@ -43,6 +61,7 @@ impl Default for Config {
             },
             stale_days: 14,
             editor: None,
+            git: GitConfig::default(),
         }
     }
 }
