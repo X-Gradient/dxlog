@@ -162,7 +162,7 @@ class DxlogPlugin(BasePlugin[DxlogPluginConfig]):
             
             # Generate markdown content from dxlog item
             content = self.content_generator.generate_page_content(
-                item, item_id, self.cross_references
+                item, item_id, self.cross_references, self.research_items
             )
             
             return content

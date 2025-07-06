@@ -178,11 +178,21 @@ class DxlogParser:
             if uuid:
                 uuid_to_id[uuid] = item_id
         
-        # Find references in content
+        # Find references in content and frontmatter
         for item_id, item in items.items():
-            refs = self._find_references(item.get("content", ""), uuid_to_id)
+            refs = []
+            
+            # Check content for UUID references
+            content_refs = self._find_references(item.get("content", ""), uuid_to_id)
+            refs.extend(content_refs)
+            
+            # Check frontmatter references field
+            frontmatter_refs = self._find_frontmatter_references(item.get("metadata", {}), uuid_to_id)
+            refs.extend(frontmatter_refs)
+            
+            # Remove duplicates and add to cross_refs if any found
             if refs:
-                cross_refs[item_id] = refs
+                cross_refs[item_id] = list(set(refs))
         
         return cross_refs
     
@@ -197,5 +207,30 @@ class DxlogParser:
             uuid = match.group()
             if uuid in uuid_to_id:
                 references.append(uuid_to_id[uuid])
+        
+        return references
+    
+    def _find_frontmatter_references(self, metadata: Dict[str, Any], uuid_to_id: Dict[str, str]) -> List[str]:
+        """Find UUID references in frontmatter metadata."""
+        references = []
+        
+        # Check the 'references' field in frontmatter
+        refs_field = metadata.get("references", [])
+        if isinstance(refs_field, list):
+            for ref in refs_field:
+                if isinstance(ref, str) and ref in uuid_to_id:
+                    references.append(uuid_to_id[ref])
+        elif isinstance(refs_field, str) and refs_field in uuid_to_id:
+            references.append(uuid_to_id[refs_field])
+        
+        # Also check other potential reference fields
+        for field_name in ["related", "depends_on", "references_to", "links_to"]:
+            field_value = metadata.get(field_name, [])
+            if isinstance(field_value, list):
+                for ref in field_value:
+                    if isinstance(ref, str) and ref in uuid_to_id:
+                        references.append(uuid_to_id[ref])
+            elif isinstance(field_value, str) and field_value in uuid_to_id:
+                references.append(uuid_to_id[field_value])
         
         return references

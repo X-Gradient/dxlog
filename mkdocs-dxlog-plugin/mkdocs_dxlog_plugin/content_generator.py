@@ -56,7 +56,7 @@ class ContentGenerator:
         return "/".join(path_parts)
     
     def generate_page_content(self, item: Dict[str, Any], item_id: str, 
-                            cross_references: Dict[str, List[str]]) -> str:
+                            cross_references: Dict[str, List[str]], all_items: Dict[str, Dict[str, Any]] = None) -> str:
         """Generate markdown content for a research item page."""
         metadata = item.get("metadata", {})
         content = item.get("content", "")
@@ -65,52 +65,39 @@ class ContentGenerator:
         title = item.get("title", "Untitled")
         item_type = item.get("type", "unknown").title()
         
-        page_content = [f"# {title}"]
-        
-        # Add metadata section
-        page_content.append("\n## Metadata\n")
-        page_content.append(f"**Type**: {item_type}")
-        
-        if "status" in metadata:
-            page_content.append(f"**Status**: {metadata['status']}")
-        
-        if "date" in metadata:
-            page_content.append(f"**Date**: {metadata['date']}")
-        
-        if "tags" in metadata:
-            tags = metadata["tags"]
-            if isinstance(tags, list):
-                page_content.append(f"**Tags**: {', '.join(tags)}")
-            else:
-                page_content.append(f"**Tags**: {tags}")
-        
-        # Add custom metadata fields
-        custom_fields = self._get_custom_fields(metadata, item_type.lower())
-        if custom_fields:
-            page_content.append("\n### Additional Information\n")
-            for field, value in custom_fields.items():
-                page_content.append(f"**{field.title()}**: {value}")
+        page_content = []
         
         # Add main content
         if content.strip():
-            page_content.append(f"\n## Content\n\n{content}")
+            page_content.append(content)
         
-        # Add cross-references
+        # Add enhanced cross-references BEFORE the metadata section
         refs = cross_references.get(item_id, [])
         if refs:
             page_content.append("\n## Related Items\n")
             for ref_id in refs:
-                # Convert to MkDocs internal link
-                link = self._generate_internal_link(ref_id)
-                page_content.append(f"- [{ref_id}]({link})")
+                ref_link = self._generate_enhanced_reference_link(ref_id, all_items)
+                page_content.append(f"- {ref_link}")
         
-        # Add backlinks
+        # Add enhanced backlinks
         backlinks = self._find_backlinks(item_id, cross_references)
         if backlinks:
             page_content.append("\n## Referenced By\n")
             for ref_id in backlinks:
-                link = self._generate_internal_link(ref_id)
-                page_content.append(f"- [{ref_id}]({link})")
+                ref_link = self._generate_enhanced_reference_link(ref_id, all_items)
+                page_content.append(f"- {ref_link}")
+        
+        page_content.append("\n---")
+
+        # Add simplified metadata
+        metadata_section = self._generate_metadata_card(item, metadata, item_type)
+        page_content.append(metadata_section)
+        
+        # Add literature source buttons if applicable
+        if item_type.lower() == "literature" and "source" in metadata:
+            source_buttons = self._generate_source_buttons(metadata["source"])
+            if source_buttons:
+                page_content.append(source_buttons)
         
         return "\n".join(page_content)
     
@@ -135,11 +122,193 @@ class ContentGenerator:
         
         return custom_fields
     
-    def _generate_internal_link(self, item_id: str) -> str:
+    def _generate_internal_link(self, item_id: str, all_items: Dict[str, Dict[str, Any]] = None) -> str:
         """Generate MkDocs internal link for an item."""
-        # This is a simplified approach - in practice, you'd need to
-        # look up the actual file path for the item
-        return f"../{item_id}/"
+        if all_items and item_id in all_items:
+            item = all_items[item_id]
+            # Get the item type and generate relative path
+            item_type = item.get("type", "unknown")
+            title = item.get("title", "untitled")
+            
+            # Sanitize title for URL
+            safe_title = re.sub(r'[^\w\s-]', '', title).strip()
+            safe_title = re.sub(r'[-\s]+', '-', safe_title)
+            
+            # Generate relative path from current item to target item
+            # Current path: mcp research/current_type/current_item/
+            # Target path: mcp research/target_type/target_item/
+            # Relative path: ../../target_type/target_item/
+            return f"../../{item_type}/{safe_title}/"
+        else:
+            # Fallback to simple approach
+            return f"../{item_id}/"
+    
+    def _generate_metadata_card(self, item: Dict[str, Any], metadata: Dict[str, Any], item_type: str) -> str:
+        """Generate simplified metadata display."""
+        content = []
+        
+        # Simple metadata section
+        content.append('\n<div class="dxlog-metadata-simple" markdown="1">')
+        
+        metadata_content = []
+        # Type and Status on same line
+        type_badge = self._get_type_badge(item_type.lower())
+        status_info = ""
+        if "status" in metadata:
+            status = metadata["status"]
+            status_badge = self._get_status_badge(status)
+            status_class = self._get_status_class(status)
+            status_info = f' • <span class="dxlog-status {status_class}">{status_badge} {status}</span>'
+        
+        metadata_content.append(f'**Type**: {type_badge} {item_type}{status_info}')
+        
+        # Date
+        if "date" in metadata:
+            date_str = metadata["date"]
+            formatted_date = self._format_date(date_str)
+            metadata_content.append(f'**Date**: {formatted_date}')
+        
+        # Creator
+        if "created_by" in metadata:
+            creator = metadata["created_by"]
+            if isinstance(creator, dict):
+                name = creator.get("name", "Unknown")
+                email = creator.get("email", "")
+                creator_text = name
+                if email:
+                    creator_text += f" ({email})"
+                metadata_content.append(f'**Author**: {creator_text}')
+        
+        # Tags
+        if "tags" in metadata:
+            tags = metadata["tags"]
+            if isinstance(tags, list) and tags:
+                tag_pills = []
+                for tag in tags:
+                    tag_class = self._get_tag_class(tag)
+                    tag_pills.append(f'<span class="dxlog-tag {tag_class}">{tag}</span>')
+                metadata_content.append(f'**Tags**: {" ".join(tag_pills)}')
+        
+        content.append("\n<br>".join(metadata_content))
+        content.append('</div>')
+
+        return "\n".join(content)
+    
+    def _generate_source_buttons(self, source: Dict[str, Any]) -> str:
+        """Generate action buttons for literature sources."""
+        if not source:
+            return ""
+        
+        buttons = []
+        button_content = ['\n<div class="dxlog-source-buttons" markdown="1">']
+        button_content.append('## 🔗 External Sources\n')
+        
+        # arXiv button
+        if source.get("arxiv_url"):
+            arxiv_url = source["arxiv_url"]
+            buttons.append(f'<a href="{arxiv_url}" class="dxlog-source-btn dxlog-arxiv-btn" target="_blank">📄 arXiv Paper</a>')
+        
+        # GitHub button
+        if source.get("repository_url"):
+            repo_url = source["repository_url"]
+            buttons.append(f'<a href="{repo_url}" class="dxlog-source-btn dxlog-github-btn" target="_blank">🐙 GitHub Repository</a>')
+        
+        # DOI button
+        if source.get("doi"):
+            doi = source["doi"]
+            doi_url = f"https://doi.org/{doi}" if not doi.startswith("http") else doi
+            buttons.append(f'<a href="{doi_url}" class="dxlog-source-btn dxlog-doi-btn" target="_blank">🎓 DOI Link</a>')
+        
+        # PDF button
+        if source.get("pdf_url"):
+            pdf_url = source["pdf_url"]
+            buttons.append(f'<a href="{pdf_url}" class="dxlog-source-btn dxlog-pdf-btn" target="_blank">📑 PDF Download</a>')
+        
+        if buttons:
+            button_content.append('<div class="dxlog-button-group">')
+            button_content.extend(buttons)
+            button_content.append('</div>')
+            button_content.append('</div>')
+            return "\n".join(button_content)
+        
+        return ""
+    
+    def _generate_enhanced_reference_link(self, ref_id: str, all_items: Dict[str, Dict[str, Any]] = None) -> str:
+        """Generate enhanced reference link with title resolution."""
+        # Try to find the referenced item to get its title
+        ref_title = self._resolve_reference_title(ref_id, all_items)
+        if ref_title:
+            link = self._generate_internal_link(ref_id, all_items)
+            ref_type = self._get_reference_type(ref_id, all_items)
+            type_badge = self._get_type_badge(ref_type) if ref_type else ""
+            return f"{type_badge} [{ref_title}]({link}) <small>({ref_id[:8]}...)</small>"
+        else:
+            link = self._generate_internal_link(ref_id, all_items)
+            return f"[{ref_id}]({link})"
+    
+    def _resolve_reference_title(self, ref_id: str, all_items: Dict[str, Dict[str, Any]] = None) -> str:
+        """Resolve reference ID to actual title."""
+        if all_items and ref_id in all_items:
+            return all_items[ref_id].get("title", ref_id)
+        return None
+    
+    def _get_reference_type(self, ref_id: str, all_items: Dict[str, Dict[str, Any]] = None) -> str:
+        """Get the type of the referenced item."""
+        if all_items and ref_id in all_items:
+            return all_items[ref_id].get("type", "unknown")
+        return "unknown"
+    
+    def _format_date(self, date_str: str) -> str:
+        """Format date string for better display."""
+        if not date_str:
+            return "Not specified"
+        
+        try:
+            from datetime import datetime
+            date_obj = datetime.strptime(date_str, "%Y-%m-%d")
+            return date_obj.strftime("%B %d, %Y")
+        except:
+            return date_str
+    
+    def _generate_avatar(self, name: str) -> str:
+        """Generate a simple avatar for the creator."""
+        if not name:
+            return "👤"
+        
+        # Generate initials
+        initials = "".join([word[0].upper() for word in name.split() if word][:2])
+        return f'<span class="dxlog-avatar">{initials}</span>'
+    
+    def _get_status_class(self, status: str) -> str:
+        """Get CSS class for status styling."""
+        status_lower = status.lower()
+        class_map = {
+            'active': 'dxlog-status-active',
+            'completed': 'dxlog-status-completed',
+            'proven': 'dxlog-status-proven',
+            'disproven': 'dxlog-status-disproven',
+            'archived': 'dxlog-status-archived',
+            'inprogress': 'dxlog-status-inprogress',
+            'draft': 'dxlog-status-draft',
+            'published': 'dxlog-status-published'
+        }
+        return class_map.get(status_lower, 'dxlog-status-default')
+    
+    def _get_tag_class(self, tag: str) -> str:
+        """Get CSS class for tag styling based on tag content."""
+        tag_lower = tag.lower()
+        
+        # Category-based styling
+        if tag_lower in ['security', 'vulnerability', 'threat']:
+            return 'dxlog-tag-security'
+        elif tag_lower in ['arxiv', 'github', 'academic']:
+            return 'dxlog-tag-source'
+        elif tag_lower in ['implementation', 'code', 'technical']:
+            return 'dxlog-tag-technical'
+        elif tag_lower in ['enterprise', 'business', 'industry']:
+            return 'dxlog-tag-business'
+        else:
+            return 'dxlog-tag-default'
     
     def _find_backlinks(self, item_id: str, cross_references: Dict[str, List[str]]) -> List[str]:
         """Find items that reference this item."""
